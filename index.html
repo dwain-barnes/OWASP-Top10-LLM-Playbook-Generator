@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OWASP LLM Playbook Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        #vulnerability-selection {
+            margin-bottom: 20px;
+        }
+        select, button {
+            padding: 10px;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .export-button {
+            background-color: #27ae60;
+            margin-right: 10px;
+        }
+        .export-button:hover {
+            background-color: #219955;
+        }
+        #export-md-button {
+            background-color: #7b5bbe;
+        }
+        #export-md-button:hover {
+            background-color: #6a4eaa;
+        }
+        #playbook-content {
+            white-space: pre-wrap;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            min-height: 100px;
+        }
+        .loading {
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        .error {
+            color: #e74c3c;
+        }
+        
+        /* Add styles for markdown formatting */
+        #playbook-content h1, #playbook-content h2, #playbook-content h3 {
+            margin-top: 16px;
+            margin-bottom: 8px;
+        }
+        
+        #playbook-content ul, #playbook-content ol {
+            padding-left: 20px;
+        }
+        
+        #playbook-content code {
+            background-color: #f0f0f0;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        
+        #playbook-content pre {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>OWASP Top 10 for LLM Applications 2025 Playbook Generator</h1>
+        <p>Select a vulnerability from the OWASP Top 10 for LLM Applications to generate a comprehensive security playbook.</p>
+    </header>
+    <main>
+        <section id="vulnerability-selection">
+            <h2>Select a Vulnerability</h2>
+            <select id="vulnerability-dropdown">
+                <option value="">-- Select a vulnerability --</option>
+            </select>
+            <button id="generate-button">Generate Playbook</button>
+            <div id="export-buttons" style="display: none; margin-top: 15px;">
+                <button id="export-md-button" class="export-button">Export as Markdown</button>
+            
+            </div>
+        </section>
+        
+        <section id="owasp-context" style="display: none; margin: 20px 0; padding: 15px; background-color: #f0f7ff; border-left: 4px solid #3498db; border-radius: 3px;">
+            <h2>OWASP Context</h2>
+            <div id="context-content">
+                <p id="context-description"></p>
+                <div id="context-examples"></div>
+                <p><a id="context-link" href="#" target="_blank">View OWASP Documentation</a></p>
+                <div id="search-results" style="display: none; margin-top: 10px;">
+                    <h3>Sources Used</h3>
+                    <ul id="search-urls-list"></ul>
+                </div>
+            </div>
+        </section>
+        
+        <section id="playbook-display">
+            <div id="playbook-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Generated Playbook</h2>
+                <div id="cache-info" style="display: none; font-size: 0.8em; color: #666;">
+                    <span id="cache-status"></span>
+                </div>
+            </div>
+            <div id="playbook-content">
+                Select a vulnerability and click "Generate Playbook" to see the mitigation steps.
+            </div>
+        </section>
+    </main>
+    <footer style="margin-top: 30px; font-size: 0.9em; color: #7f8c8d; text-align: center;">
+        <p>This tool uses AI to generate security playbooks. Always verify mitigations with security professionals before implementation.</p>
+    </footer>
+    
+    <!-- Include marked.js for Markdown rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropdown = document.getElementById('vulnerability-dropdown');
+            const generateButton = document.getElementById('generate-button');
+            const playbookContent = document.getElementById('playbook-content');
+            
+            // Configure base URL - change this if your backend is hosted elsewhere
+            const backendUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? 'http://localhost:5000' 
+                : '';  // Empty string means same origin
+
+            // Fetch vulnerabilities from the backend and populate dropdown
+            fetch(`${backendUrl}/vulnerabilities`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to fetch vulnerabilities');
+                    return response.json();
+                })
+                .then(data => {
+                    data.forEach(vuln => {
+                        const option = document.createElement('option');
+                        option.value = vuln;
+                        option.textContent = vuln;
+                        dropdown.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    playbookContent.innerHTML = `Error: ${error.message}`;
+                    playbookContent.classList.add('error');
+                });
+
+            const exportMdButton = document.getElementById('export-md-button');
+          
+            const owaswContextSection = document.getElementById('owasp-context');
+            const contextDescription = document.getElementById('context-description');
+            const contextExamples = document.getElementById('context-examples');
+            const contextLink = document.getElementById('context-link');
+            const cacheInfo = document.getElementById('cache-info');
+            const cacheStatus = document.getElementById('cache-status');
+            
+            // Function to update the OWASP context display
+            function updateOWASPContext(owasp_context) {
+                if (!owasp_context) return;
+                
+                contextDescription.textContent = owasp_context.description || 'No description available';
+                
+                // Format examples
+                if (owasp_context.examples && owasp_context.examples.length > 0) {
+                    contextExamples.innerHTML = '<p><strong>Common examples:</strong></p><ul>' + 
+                        owasp_context.examples.map(ex => `<li>${ex}</li>`).join('') + 
+                        '</ul>';
+                } else {
+                    contextExamples.innerHTML = '';
+                }
+                
+                // Set link
+                if (owasp_context.url) {
+                    contextLink.href = owasp_context.url;
+                    contextLink.style.display = 'inline';
+                } else {
+                    contextLink.style.display = 'none';
+                }
+                
+                // Display search results if available
+                const searchResultsDiv = document.getElementById('search-results');
+                const searchUrlsList = document.getElementById('search-urls-list');
+                
+                if (owasp_context.search_urls && owasp_context.search_urls.length > 0) {
+                    searchUrlsList.innerHTML = '';
+                    owasp_context.search_urls.forEach(url => {
+                        const li = document.createElement('li');
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.textContent = url;
+                        a.target = '_blank';
+                        li.appendChild(a);
+                        searchUrlsList.appendChild(li);
+                    });
+                    searchResultsDiv.style.display = 'block';
+                } else {
+                    searchResultsDiv.style.display = 'none';
+                }
+                
+                owaswContextSection.style.display = 'block';
+            }
+            
+            // Function to show cache status if cached
+            function updateCacheStatus(data) {
+                if (data.cached) {
+                    const timestamp = new Date(data.timestamp);
+                    const formattedDate = timestamp.toLocaleDateString() + ' ' + timestamp.toLocaleTimeString();
+                    cacheStatus.textContent = `Cached version from ${formattedDate}`;
+                    cacheInfo.style.display = 'block';
+                } else {
+                    cacheInfo.style.display = 'none';
+                }
+            }
+            
+            // Function to enable/disable export buttons
+            function toggleExportButtons(enabled, vulnerability) {
+                const exportButtons = document.getElementById('export-buttons');
+                
+                if (enabled) {
+                    exportButtons.style.display = 'block';
+                    
+                    // Set up export button handlers
+                    exportMdButton.onclick = () => {
+                        window.location.href = `${backendUrl}/export_markdown/${vulnerability}`;
+                    };
+                    
+                 
+                } else {
+                    exportButtons.style.display = 'none';
+                }
+            }
+            
+            // Handle button click to generate playbook
+            generateButton.addEventListener('click', () => {
+                const selectedVuln = dropdown.value;
+                if (!selectedVuln || selectedVuln === '') {
+                    alert('Please select a vulnerability.');
+                    return;
+                }
+
+                // Hide export buttons while generating
+                toggleExportButtons(false);
+                
+                // Reset OWASP context section
+                owaswContextSection.style.display = 'none';
+                
+                // Show loading state
+                playbookContent.innerHTML = 'Generating playbook... This may take a few seconds.';
+                playbookContent.classList.remove('error');
+                playbookContent.classList.add('loading');
+
+                // Send request to backend
+                fetch(`${backendUrl}/generate_playbook`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ vulnerability: selectedVuln })
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to generate playbook');
+                    return response.json();
+                })
+                .then(data => {
+                    playbookContent.classList.remove('loading');
+                    if (data.error) {
+                        playbookContent.innerHTML = `Error: ${data.error}`;
+                        playbookContent.classList.add('error');
+                        toggleExportButtons(false);
+                    } else {
+                        // Use marked.js to render markdown
+                        playbookContent.innerHTML = marked.parse(data.playbook);
+                        
+                        // Enable export buttons
+                        toggleExportButtons(true, selectedVuln);
+                        
+                        // Update OWASP context if available
+                        if (data.owasp_context) {
+                            updateOWASPContext(data.owasp_context);
+                        }
+                        
+                        // Show cache status if applicable
+                        updateCacheStatus(data);
+                    }
+                })
+                .catch(error => {
+                    playbookContent.classList.remove('loading');
+                    playbookContent.innerHTML = `Error: ${error.message}`;
+                    playbookContent.classList.add('error');
+                    toggleExportButtons(false);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
