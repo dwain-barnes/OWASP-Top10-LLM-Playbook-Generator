@@ -1,4 +1,4 @@
-# OWASP LLM Playbook Generator
+# OWASP TOP 10 LLM Playbook Generator
 
 An interactive web application that generates comprehensive security playbooks for mitigating the OWASP Top 10 vulnerabilities specific to Large Language Model (LLM) applications. The application consists of a Flask backend that leverages the OpenAI API to generate detailed playbooks, paired with a simple HTML/JavaScript frontend.
 
